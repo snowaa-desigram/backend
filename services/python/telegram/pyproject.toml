@@ -3,6 +3,7 @@ name = "telegram-service"
 version = "0.1.0"
 description = "Desigram Telegram gRPC microservice"
 requires-python = ">=3.13"
+license = "MIT"
 dependencies = [
     "desigram-common",
 ]

@@ -3,6 +3,7 @@ name = "desigram-common"
 version = "0.1.0"
 description = "Общий каркас Python gRPC-микросервисов + сгенерированные контракты (desigram.*)"
 requires-python = ">=3.13"
+license = "MIT"
 dependencies = [
     "grpcio>=1.75",
     "grpcio-health-checking>=1.75",
