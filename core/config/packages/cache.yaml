@@ -1,0 +1,5 @@
+framework:
+    cache:
+        # Общий кеш для всех реплик core — в Redis
+        app: cache.adapter.redis
+        default_redis_provider: '%env(REDIS_URL)%'

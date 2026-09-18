@@ -1,0 +1,33 @@
+framework:
+    messenger:
+        default_bus: command.bus
+        buses:
+            command.bus:
+                middleware:
+                    - doctrine_transaction
+            query.bus: ~
+            event.bus:
+                default_middleware:
+                    allow_no_handlers: true
+
+        failure_transport: failed
+
+        transports:
+            # Тяжёлые команды уходят в RabbitMQ и выполняются core-worker'ом (messenger:consume async),
+            # HTTP-запрос не ждёт. Реплики worker'а масштабируются независимо от core.
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                retry_strategy:
+                    max_retries: 3
+                    multiplier: 2
+            failed: 'doctrine://default?queue_name=failed'
+            sync: 'sync://'
+
+        routing:
+            App\Notification\Application\Command\SendPhoto\SendPhotoCommand: async
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                async: 'in-memory://'

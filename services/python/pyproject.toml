@@ -1,0 +1,19 @@
+# uv workspace: общий каркас (common) + Python-микросервисы.
+# Новый сервис: скопировать telegram/, добавить в members.
+[project]
+name = "desigram-python"
+version = "0.1.0"
+requires-python = ">=3.13"
+
+[tool.uv.workspace]
+members = ["common", "telegram"]
+
+[tool.uv.sources]
+desigram-common = { workspace = true }
+
+[dependency-groups]
+dev = ["ruff>=0.13"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["common/gen"]

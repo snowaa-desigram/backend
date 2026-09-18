@@ -1,0 +1,18 @@
+# go-zero zrpc: https://go-zero.dev/docs/tutorials/grpc/server/configuration
+Name: ping.rpc
+ListenOn: 0.0.0.0:50051
+# dev|test|pre|pro — в dev/test включён grpc reflection (для grpcurl)
+Mode: ${MODE}
+Timeout: 5000
+Log:
+  Encoding: json
+  Level: info
+Prometheus:
+  Host: 0.0.0.0
+  Port: 9091
+  Path: /metrics
+Telemetry:
+  Name: ping.rpc
+  Endpoint: ${OTEL_ENDPOINT}
+  Batcher: otlphttp
+  Sampler: 1.0

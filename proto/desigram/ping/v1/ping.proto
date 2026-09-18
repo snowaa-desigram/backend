@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package desigram.ping.v1;
+
+option go_package = "github.com/snowaa-desigram/backend/services/go/gen/desigram/ping/v1;pingv1";
+
+// Заглушка Go-микросервиса: проверка связи core -> go.
+service PingService {
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+message PingRequest {
+  string message = 1;
+}
+
+message PingResponse {
+  string message = 1;
+  string service = 2;
+}

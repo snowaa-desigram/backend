@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../vendor/symfony/routing/Loader/schema/routing.schema.json
+
+# Маршруты объявляются атрибутами #[Route] в */Presentation/Http.
+controllers:
+    resource:
+        path: ../src/
+        namespace: App
+    type: attribute

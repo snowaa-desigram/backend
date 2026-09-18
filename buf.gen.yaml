@@ -1,0 +1,24 @@
+# Генерация: make proto (образ enviropment/buf — buf + локальные плагины)
+version: v2
+inputs:
+  - directory: proto
+plugins:
+  # Go
+  - local: protoc-gen-go
+    out: services/go/gen
+    opt: paths=source_relative
+  - local: protoc-gen-go-grpc
+    out: services/go/gen
+    opt: paths=source_relative
+  # PHP (Symfony core — gRPC-клиенты)
+  - protoc_builtin: php
+    out: core/gen
+  - local: grpc_php_plugin
+    out: core/gen
+  # Python (telegram)
+  - protoc_builtin: python
+    out: services/python/common/gen
+  - protoc_builtin: pyi
+    out: services/python/common/gen
+  - local: grpc_python_plugin
+    out: services/python/common/gen

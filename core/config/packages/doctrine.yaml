@@ -1,0 +1,51 @@
+doctrine:
+    dbal:
+        url: '%env(resolve:DATABASE_URL)%'
+        profiling_collect_backtrace: '%kernel.debug%'
+    orm:
+        validate_xml_mapping: true
+        naming_strategy: doctrine.orm.naming_strategy.underscore
+        auto_mapping: true
+        # Сущности живут в <Context>/Domain, маппинг — атрибутами.
+        mappings:
+            App:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src'
+                prefix: 'App'
+                alias: App
+
+        # В SQL — только через Redis (во всех окружениях):
+        #  - query cache: разобранные DQL
+        #  - result cache: результаты запросов (репозитории через CachedRepository::remember)
+        #  - second level cache: сущности/коллекции, помеченные #[ORM\Cache]
+        query_cache_driver:
+            type: pool
+            pool: doctrine.query_cache_pool
+        result_cache_driver:
+            type: pool
+            pool: doctrine.result_cache_pool
+        second_level_cache:
+            enabled: true
+            region_cache_driver:
+                type: pool
+                pool: doctrine.l2_cache_pool
+            regions:
+                default:
+                    lifetime: 3600
+
+framework:
+    cache:
+        pools:
+            doctrine.query_cache_pool:
+                adapter: cache.app
+            doctrine.result_cache_pool:
+                adapter: cache.app
+                default_lifetime: 3600
+            doctrine.l2_cache_pool:
+                adapter: cache.app
+
+when@test:
+    doctrine:
+        dbal:
+            dbname_suffix: '_test%env(default::TEST_TOKEN)%'

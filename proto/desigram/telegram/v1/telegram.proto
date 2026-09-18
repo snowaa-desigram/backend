@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package desigram.telegram.v1;
+
+option go_package = "github.com/snowaa-desigram/backend/services/go/gen/desigram/telegram/v1;telegramv1";
+
+// Python-микросервис Telegram: отправка изображений и т.д.
+service TelegramService {
+  rpc SendPhoto(SendPhotoRequest) returns (SendPhotoResponse);
+}
+
+message SendPhotoRequest {
+  int64 chat_id = 1;
+  bytes photo = 2;
+  string caption = 3;
+}
+
+message SendPhotoResponse {
+  int64 message_id = 1;
+}

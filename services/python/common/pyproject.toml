@@ -1,0 +1,19 @@
+[project]
+name = "desigram-common"
+version = "0.1.0"
+description = "Общий каркас Python gRPC-микросервисов + сгенерированные контракты (desigram.*)"
+requires-python = ">=3.13"
+dependencies = [
+    "grpcio>=1.75",
+    "grpcio-health-checking>=1.75",
+    "grpcio-reflection>=1.75",
+    "protobuf>=6.31",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# gen/ генерируется buf (backend/buf.gen.yaml), импортируется как `desigram.*`
+[tool.hatch.build.targets.wheel]
+packages = ["desigram_common", "gen/desigram"]

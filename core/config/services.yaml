@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+
+parameters:
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Обработчики команд/запросов регистрируются на своей шине по маркер-интерфейсу.
+    _instanceof:
+        App\Shared\Application\Bus\Command\CommandHandler:
+            tags: [{ name: messenger.message_handler, bus: command.bus }]
+        App\Shared\Application\Bus\Query\QueryHandler:
+            tags: [{ name: messenger.message_handler, bus: query.bus }]
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Kernel.php'
+            - '../src/**/Domain/'
+            - '../src/**/Application/{Command,Query}/**/*{Command,Query,Result}.php'
