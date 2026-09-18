@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ef3b91bbf190efb7be8b6ee895090a9f",
+    "content-hash": "8a3737dbccfb32b4f2989e9328eaf4c3",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -9201,8 +9201,8 @@
     "platform-dev": {},
     "platform-overrides": {
         "php": "8.4.0",
-        "ext-grpc": "1.82.0",
-        "ext-protobuf": "4.33.0",
+        "ext-grpc": "1.84.0",
+        "ext-protobuf": "5.36.2",
         "ext-redis": "6.2.0",
         "ext-amqp": "2.1.2"
     },

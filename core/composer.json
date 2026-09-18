@@ -37,8 +37,8 @@
         "sort-packages": true,
         "platform": {
             "php": "8.4.0",
-            "ext-grpc": "1.82.0",
-            "ext-protobuf": "4.33.0",
+            "ext-grpc": "1.84.0",
+            "ext-protobuf": "5.36.2",
             "ext-redis": "6.2.0",
             "ext-amqp": "2.1.2"
         },
