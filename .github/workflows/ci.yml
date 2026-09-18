@@ -1,0 +1,84 @@
+# CI backend: контракты, архитектура, статика, unit/интеграционные тесты — на каждый PR и push в main.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---- gRPC-контракты: lint + что сломалось относительно main ----
+  proto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-action@v1
+        with:
+          input: proto
+          lint: true
+          format: true
+          breaking: ${{ github.event_name == 'pull_request' }}
+          breaking_against: https://github.com/${{ github.repository }}.git#branch=main,subdir=proto
+          push: false
+          archive: false
+
+  # ---- Symfony core: cs-fixer, phpstan, deptrac, phpunit ----
+  php:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          # grpc/protobuf/redis/amqp не нужны: в тестах порты подменяются in-memory, кеш — array
+          extensions: intl, pdo_mysql
+          coverage: none
+      - uses: ramsey/composer-install@v3
+        with:
+          working-directory: core
+      - run: composer lint
+      - run: composer test
+
+  # ---- Go-сервисы: vet, golangci-lint (+ depguard — архитектурные правила), tests ----
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/go/go.mod
+          cache-dependency-path: services/go/go.sum
+      - run: go vet ./...
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          working-directory: services/go
+      - run: go test -race ./...
+      - name: Build every service
+        run: go build ./cmd/...
+
+  # ---- Python-сервисы: ruff, pytest ----
+  python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/python/uv.lock
+      - run: uv sync --frozen --all-packages
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q

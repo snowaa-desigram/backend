@@ -20,3 +20,11 @@ services:
             - '../src/Kernel.php'
             - '../src/**/Domain/'
             - '../src/**/Application/{Command,Query}/**/*{Command,Query,Result}.php'
+
+# В тестах внешние сервисы (gRPC) подменяются in-memory реализациями портов.
+when@test:
+    services:
+        App\Tests\Fake\InMemoryPingGateway: ~
+        App\Tests\Fake\InMemoryTelegramNotifier: ~
+        App\Ping\Application\Port\PingGateway: '@App\Tests\Fake\InMemoryPingGateway'
+        App\Notification\Application\Port\TelegramNotifier: '@App\Tests\Fake\InMemoryTelegramNotifier'
