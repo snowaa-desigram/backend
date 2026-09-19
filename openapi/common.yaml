@@ -1,0 +1,41 @@
+# Общие компоненты всех HTTP-контрактов Desigram (auth — Go, core — PHP, sync — PHP).
+# Одна схема ошибки на всю систему: фронт держит один тип ApiError.
+openapi: 3.1.0
+info:
+  title: Desigram common components
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: машиночитаемый код ошибки
+          enum:
+            # общие (core, любой сервис)
+            - validation
+            - unauthorized
+            - forbidden
+            - not_found
+            - method_not_allowed
+            - conflict
+            - too_many_requests
+            - service_unavailable
+            - internal
+            # auth
+            - email_taken
+            - invalid_credentials
+            - email_not_verified
+            - invalid_code
+            - code_expired
+            - invalid_token
+            - too_many_attempts
+        message:
+          type: string
+        details:
+          type: object
+          description: для `validation` — поле → сообщение
+          additionalProperties: { type: string }

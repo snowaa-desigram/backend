@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Persistence\Doctrine;
 
+use App\Shared\Application\Event\EventBus;
+use App\Shared\Domain\AggregateRoot;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -15,6 +17,8 @@ use Symfony\Contracts\Cache\ItemInterface;
  *
  *  - чтение:  remember($key, fn () => ...запрос к БД...)  — результат кладётся в Redis
  *  - запись:  save()/remove() пишут в БД и инвалидируют ключи через forget()
+ *  - события: save() после flush публикует события агрегата в EventBus — хендлер об этом не думает.
+ *             Async-подписчики получат сообщение только после коммита (dispatch_after_current_bus снаружи doctrine_transaction).
  *  - произвольные DQL: cachedQuery($qb, $key) включает doctrine result cache
  *
  * Прямой вызов $em->createQuery()->getResult() в наследниках — запрещён (deptrac это не ловит, ревью — ловит).
@@ -27,6 +31,7 @@ abstract class CachedRepository
         protected readonly EntityManagerInterface $em,
         #[Autowire(service: 'doctrine.result_cache_pool')]
         private readonly CacheInterface $cache,
+        private readonly EventBus $events,
     ) {
     }
 
@@ -65,6 +70,10 @@ abstract class CachedRepository
     {
         $this->em->persist($entity);
         $this->em->flush();
+
+        if ($entity instanceof AggregateRoot) {
+            $this->events->publish(...$entity->pullEvents());
+        }
     }
 
     protected function remove(object $entity): void

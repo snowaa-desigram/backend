@@ -5,3 +5,6 @@ generate:
   models: true
 output-options:
   skip-prune: true
+# общие компоненты (Error) — отдельный пакет gen/openapi/common, см. oapi-codegen.common.yaml
+import-mapping:
+  common.yaml: github.com/snowaa-desigram/backend/services/go/gen/openapi/common

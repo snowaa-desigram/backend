@@ -5,21 +5,19 @@ declare(strict_types=1);
 namespace App\Notification\Infrastructure\Grpc;
 
 use App\Notification\Application\Port\TelegramNotifier;
+use App\Shared\Infrastructure\Grpc\GrpcGateway;
 use Desigram\Telegram\V1\SendPhotoRequest;
 use Desigram\Telegram\V1\SendPhotoResponse;
 use Desigram\Telegram\V1\TelegramServiceClient;
-use Grpc\ChannelCredentials;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
-final class GrpcTelegramNotifier implements TelegramNotifier
+final class GrpcTelegramNotifier extends GrpcGateway implements TelegramNotifier
 {
     private TelegramServiceClient $client;
 
     public function __construct(#[Autowire(env: 'TELEGRAM_GRPC_ADDR')] string $address)
     {
-        $this->client = new TelegramServiceClient($address, [
-            'credentials' => ChannelCredentials::createInsecure(),
-        ]);
+        $this->client = new TelegramServiceClient($address, self::channelOptions());
     }
 
     public function sendPhoto(int $chatId, string $photo, string $caption = ''): int
@@ -29,13 +27,14 @@ final class GrpcTelegramNotifier implements TelegramNotifier
             ->setPhoto($photo)
             ->setCaption($caption);
 
-        /** @var SendPhotoResponse|null $reply */
-        [$reply, $status] = $this->client->SendPhoto($request)->wait();
-
-        if (\Grpc\STATUS_OK !== $status->code || null === $reply) {
-            throw new \RuntimeException(\sprintf('telegram grpc failed: [%d] %s', $status->code, $status->details));
-        }
+        /** @var SendPhotoResponse $reply */
+        $reply = $this->call(fn (): array => $this->client->SendPhoto($request, [], self::callOptions())->wait());
 
         return (int) $reply->getMessageId();
+    }
+
+    protected static function serviceName(): string
+    {
+        return 'telegram';
     }
 }

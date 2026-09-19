@@ -13,6 +13,9 @@ services:
             tags: [{ name: messenger.message_handler, bus: command.bus }]
         App\Shared\Application\Bus\Query\QueryHandler:
             tags: [{ name: messenger.message_handler, bus: query.bus }]
+        # Подписчики доменных событий (межконтекстная связь — только через события)
+        App\Shared\Application\Event\EventSubscriber:
+            tags: [{ name: messenger.message_handler, bus: event.bus }]
 
     App\:
         resource: '../src/'
@@ -24,6 +27,13 @@ services:
 # В тестах внешние сервисы (gRPC) подменяются in-memory реализациями портов.
 when@test:
     services:
+        # _instanceof не действует на when@test-блок — тег явно
+        App\Tests\Shared\Infrastructure\Bus\RecordingSubscriber:
+            public: true
+            tags: [{ name: messenger.message_handler, bus: event.bus }]
+        App\Shared\Application\Event\EventBus:
+            alias: App\Shared\Infrastructure\Bus\MessengerEventBus
+            public: true
         App\Tests\Fake\InMemoryPingGateway: ~
         App\Tests\Fake\InMemoryTelegramNotifier: ~
         App\Ping\Application\Port\PingGateway: '@App\Tests\Fake\InMemoryPingGateway'

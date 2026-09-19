@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\Security;
+namespace App\Shared\Presentation\Http;
 
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -11,7 +11,7 @@ use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Http\Authentication\AuthenticationFailureHandlerInterface;
 use Symfony\Component\Security\Http\EntryPoint\AuthenticationEntryPointInterface;
 
-/** 401 в том же формате ошибки, что у auth-сервиса (backend/openapi/auth.yaml, схема Error). */
+/** 401 в едином формате ошибки (ApiError ← backend/openapi/common.yaml). */
 final class JsonUnauthorizedHandler implements AuthenticationEntryPointInterface, AuthenticationFailureHandlerInterface
 {
     public function start(Request $request, ?AuthenticationException $authException = null): Response
@@ -26,10 +26,7 @@ final class JsonUnauthorizedHandler implements AuthenticationEntryPointInterface
 
     private function unauthorized(): JsonResponse
     {
-        return new JsonResponse(
-            ['code' => 'unauthorized', 'message' => 'unauthorized'],
-            Response::HTTP_UNAUTHORIZED,
-            ['WWW-Authenticate' => 'Bearer'],
-        );
+        return (new ApiError('unauthorized', 'unauthorized'))
+            ->toResponse(Response::HTTP_UNAUTHORIZED, ['WWW-Authenticate' => 'Bearer']);
     }
 }

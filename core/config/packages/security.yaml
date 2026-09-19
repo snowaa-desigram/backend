@@ -15,8 +15,8 @@ security:
             provider: jwt
             access_token:
                 token_handler: App\Shared\Infrastructure\Security\JwtAccessTokenHandler
-                failure_handler: App\Shared\Infrastructure\Security\JsonUnauthorizedHandler
-            entry_point: App\Shared\Infrastructure\Security\JsonUnauthorizedHandler
+                failure_handler: App\Shared\Presentation\Http\JsonUnauthorizedHandler
+            entry_point: App\Shared\Presentation\Http\JsonUnauthorizedHandler
 
     # Только первое совпавшее правило. Публичные /api/* — без записи здесь.
     access_control:

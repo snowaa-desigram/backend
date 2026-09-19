@@ -6,6 +6,7 @@ namespace App\Notification\Presentation\Http;
 
 use App\Notification\Application\Command\SendPhoto\SendPhotoCommand;
 use App\Shared\Application\Bus\Command\CommandBus;
+use App\Shared\Application\Exception\ValidationFailed;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,7 +27,7 @@ final readonly class SendPhotoController
     {
         $photo = $request->files->get('photo');
         if (!$photo instanceof UploadedFile) {
-            return new JsonResponse(['error' => 'photo is required'], Response::HTTP_BAD_REQUEST);
+            throw new ValidationFailed(details: ['photo' => 'is required']);
         }
 
         $this->commandBus->dispatch(new SendPhotoCommand(

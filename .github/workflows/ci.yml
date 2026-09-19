@@ -76,6 +76,7 @@ jobs:
       # OpenAPI → Go-типы должны быть перегенерированы и закоммичены (make openapi в корне монорепы)
       - name: openapi types are up to date
         run: |
+          go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config oapi-codegen.common.yaml ../../openapi/common.yaml
           go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config oapi-codegen.yaml ../../openapi/auth.yaml
           git diff --exit-code -- gen/openapi
       - run: go test -race ./...

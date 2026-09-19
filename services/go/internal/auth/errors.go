@@ -9,12 +9,13 @@ import (
 	"github.com/zeromicro/go-zero/rest/httpx"
 
 	authapi "github.com/snowaa-desigram/backend/services/go/gen/openapi/auth"
+	"github.com/snowaa-desigram/backend/services/go/gen/openapi/common"
 )
 
 // Error — ошибка, которую сервис отдаёт клиенту в формате authapi.Error из OpenAPI.
 type Error struct {
 	Status  int
-	Code    authapi.ErrorCode
+	Code    common.ErrorCode
 	Message string
 	Details map[string]string
 }
@@ -22,20 +23,20 @@ type Error struct {
 func (e *Error) Error() string { return string(e.Code) + ": " + e.Message }
 
 var (
-	ErrEmailTaken         = &Error{Status: http.StatusConflict, Code: authapi.ErrorCodeEmailTaken, Message: "email is already registered"}
-	ErrInvalidCredentials = &Error{Status: http.StatusUnauthorized, Code: authapi.ErrorCodeInvalidCredentials, Message: "invalid email or password"}
-	ErrEmailNotVerified   = &Error{Status: http.StatusForbidden, Code: authapi.ErrorCodeEmailNotVerified, Message: "email is not verified"}
-	ErrInvalidCode        = &Error{Status: http.StatusBadRequest, Code: authapi.ErrorCodeInvalidCode, Message: "invalid code"}
-	ErrCodeExpired        = &Error{Status: http.StatusGone, Code: authapi.ErrorCodeCodeExpired, Message: "code expired, request a new one"}
-	ErrInvalidToken       = &Error{Status: http.StatusUnauthorized, Code: authapi.ErrorCodeInvalidToken, Message: "invalid refresh token"}
-	ErrUnauthorized       = &Error{Status: http.StatusUnauthorized, Code: authapi.ErrorCodeUnauthorized, Message: "unauthorized"}
-	ErrTooManyAttempts    = &Error{Status: http.StatusTooManyRequests, Code: authapi.ErrorCodeTooManyAttempts, Message: "too many attempts, try later"}
-	ErrTooManyRequests    = &Error{Status: http.StatusTooManyRequests, Code: authapi.ErrorCodeTooManyRequests, Message: "code was sent recently, try later"}
+	ErrEmailTaken         = &Error{Status: http.StatusConflict, Code: common.ErrorCodeEmailTaken, Message: "email is already registered"}
+	ErrInvalidCredentials = &Error{Status: http.StatusUnauthorized, Code: common.ErrorCodeInvalidCredentials, Message: "invalid email or password"}
+	ErrEmailNotVerified   = &Error{Status: http.StatusForbidden, Code: common.ErrorCodeEmailNotVerified, Message: "email is not verified"}
+	ErrInvalidCode        = &Error{Status: http.StatusBadRequest, Code: common.ErrorCodeInvalidCode, Message: "invalid code"}
+	ErrCodeExpired        = &Error{Status: http.StatusGone, Code: common.ErrorCodeCodeExpired, Message: "code expired, request a new one"}
+	ErrInvalidToken       = &Error{Status: http.StatusUnauthorized, Code: common.ErrorCodeInvalidToken, Message: "invalid refresh token"}
+	ErrUnauthorized       = &Error{Status: http.StatusUnauthorized, Code: common.ErrorCodeUnauthorized, Message: "unauthorized"}
+	ErrTooManyAttempts    = &Error{Status: http.StatusTooManyRequests, Code: common.ErrorCodeTooManyAttempts, Message: "too many attempts, try later"}
+	ErrTooManyRequests    = &Error{Status: http.StatusTooManyRequests, Code: common.ErrorCodeTooManyRequests, Message: "code was sent recently, try later"}
 )
 
 // ValidationError — 400 с полем → сообщение.
 func ValidationError(details map[string]string) *Error {
-	return &Error{Status: http.StatusBadRequest, Code: authapi.ErrorCodeValidation, Message: "invalid request", Details: details}
+	return &Error{Status: http.StatusBadRequest, Code: common.ErrorCodeValidation, Message: "invalid request", Details: details}
 }
 
 // ErrorHandler для httpx.SetErrorHandlerCtx: *Error → свой статус, всё остальное — 500 без деталей.
@@ -50,7 +51,7 @@ func ErrorHandler(ctx context.Context, err error) (int, any) {
 	}
 
 	logx.WithContext(ctx).Errorf("internal error: %v", err)
-	return http.StatusInternalServerError, authapi.Error{Code: authapi.ErrorCodeInternal, Message: "internal error"}
+	return http.StatusInternalServerError, authapi.Error{Code: common.ErrorCodeInternal, Message: "internal error"}
 }
 
 // UnauthorizedCallback — ответ JWT-middleware go-zero в формате authapi.Error.

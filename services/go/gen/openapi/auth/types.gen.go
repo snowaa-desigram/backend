@@ -5,52 +5,9 @@ package authapi
 
 import (
 	"time"
-)
 
-// Defines values for ErrorCode.
-const (
-	ErrorCodeCodeExpired        ErrorCode = "code_expired"
-	ErrorCodeEmailNotVerified   ErrorCode = "email_not_verified"
-	ErrorCodeEmailTaken         ErrorCode = "email_taken"
-	ErrorCodeInternal           ErrorCode = "internal"
-	ErrorCodeInvalidCode        ErrorCode = "invalid_code"
-	ErrorCodeInvalidCredentials ErrorCode = "invalid_credentials"
-	ErrorCodeInvalidToken       ErrorCode = "invalid_token"
-	ErrorCodeTooManyAttempts    ErrorCode = "too_many_attempts"
-	ErrorCodeTooManyRequests    ErrorCode = "too_many_requests"
-	ErrorCodeUnauthorized       ErrorCode = "unauthorized"
-	ErrorCodeValidation         ErrorCode = "validation"
+	externalRef0 "github.com/snowaa-desigram/backend/services/go/gen/openapi/common"
 )
-
-// Valid indicates whether the value is a known member of the ErrorCode enum.
-func (e ErrorCode) Valid() bool {
-	switch e {
-	case ErrorCodeCodeExpired:
-		return true
-	case ErrorCodeEmailNotVerified:
-		return true
-	case ErrorCodeEmailTaken:
-		return true
-	case ErrorCodeInternal:
-		return true
-	case ErrorCodeInvalidCode:
-		return true
-	case ErrorCodeInvalidCredentials:
-		return true
-	case ErrorCodeInvalidToken:
-		return true
-	case ErrorCodeTooManyAttempts:
-		return true
-	case ErrorCodeTooManyRequests:
-		return true
-	case ErrorCodeUnauthorized:
-		return true
-	case ErrorCodeValidation:
-		return true
-	default:
-		return false
-	}
-}
 
 // Code defines model for Code.
 type Code = string
@@ -73,17 +30,7 @@ type EmailRequest struct {
 type Empty = map[string]interface{}
 
 // Error defines model for Error.
-type Error struct {
-	// Code машиночитаемый код ошибки
-	Code ErrorCode `json:"code"`
-
-	// Details для `validation` — поле → сообщение
-	Details *map[string]string `json:"details,omitempty"`
-	Message string             `json:"message"`
-}
-
-// ErrorCode машиночитаемый код ошибки
-type ErrorCode string
+type Error = externalRef0.Error
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {

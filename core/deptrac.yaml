@@ -1,4 +1,5 @@
 # Контроль зависимостей между слоями DDD: vendor/bin/deptrac
+# Границы между контекстами (A не импортирует B) — tests/Architecture/ContextIsolationTest.php
 deptrac:
   paths:
     - ./src

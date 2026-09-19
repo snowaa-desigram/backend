@@ -25,6 +25,7 @@ func loadSpec(t *testing.T) *openapi3.T {
 	t.Helper()
 	specOnce.Do(func() {
 		loader := openapi3.NewLoader()
+		loader.IsExternalRefsAllowed = true // Error — из common.yaml
 		spec, specErr = loader.LoadFromFile(specPath)
 		if specErr == nil {
 			specErr = spec.Validate(context.Background())
