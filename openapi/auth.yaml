@@ -9,8 +9,11 @@ info:
     при регистрации и при восстановлении пароля. Access-токен — JWT (HS256, 15 минут),
     refresh — opaque-строка (30 дней, одноразовая: при refresh выдаётся новая пара).
 servers:
-  - url: https://api.desigram.localhost:8443
-    description: local
+  - url: https://api.{domain}
+    description: домен — group_vars `domain` (локально с портом 8443)
+    variables:
+      domain:
+        default: desigram.localhost:8443
 
 tags:
   - name: registration

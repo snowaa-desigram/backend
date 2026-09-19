@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,7 @@ func newFixture(t *testing.T) *fixture {
 	f := &fixture{
 		now: time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC),
 		opts: auth.Options{
+			AppName:   "TestApp",
 			AccessTTL: 15 * time.Minute, RefreshTTL: 30 * 24 * time.Hour,
 			CodeTTL: 10 * time.Minute, CodeCooldown: time.Minute, CodeMaxAttempts: 3,
 			LoginMaxFailures: 3, LoginWindow: 15 * time.Minute,
@@ -93,8 +95,8 @@ func TestRegisterConfirmLogin(t *testing.T) {
 	if err := f.svc.Register(ctx, testEmail, testPassword); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	if m := f.mailer.Last(); m == nil || m.To != testEmail {
-		t.Fatalf("mail = %+v, want to %s", m, testEmail)
+	if m := f.mailer.Last(); m == nil || m.To != testEmail || !strings.HasPrefix(m.Subject, "TestApp: ") {
+		t.Fatalf("mail = %+v, want to %s with subject prefix TestApp", m, testEmail)
 	}
 
 	// до подтверждения логин запрещён

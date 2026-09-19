@@ -11,6 +11,7 @@ import (
 
 // Options — параметры логики (см. Config.Options).
 type Options struct {
+	AppName          string
 	AccessTTL        time.Duration
 	RefreshTTL       time.Duration
 	CodeTTL          time.Duration
@@ -243,7 +244,7 @@ func (s *Service) sendCode(ctx context.Context, purpose CodePurpose, email strin
 		return err
 	}
 	t := mailTemplates[purpose]
-	return s.mailer.Send(ctx, email, t.subject, fmt.Sprintf(t.body, code, int(s.opts.CodeTTL.Minutes())))
+	return s.mailer.Send(ctx, email, s.opts.AppName+": "+t.subject, fmt.Sprintf(t.body, code, int(s.opts.CodeTTL.Minutes())))
 }
 
 func (s *Service) verifyCode(ctx context.Context, purpose CodePurpose, email, code string) error {

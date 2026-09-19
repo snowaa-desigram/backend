@@ -19,6 +19,9 @@ Telemetry:
   Batcher: otlphttp
   Sampler: 1.0
 
+# Имя продукта в письмах
+AppName: ${APP_NAME}
+
 # JWT HS256 — секрет общий с core (JWT_SECRET); AccessExpire — секунды
 Auth:
   AccessSecret: ${JWT_SECRET}
