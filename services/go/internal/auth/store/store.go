@@ -1,4 +1,4 @@
-package auth
+package store
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Хранилища — единственные интерфейсы в пакете: ради in-memory реализации в тестах.
+// Модели и интерфейсы хранилищ: реализации — gorm.go, redis.go, memory.go (тесты/dev).
 
 var (
 	ErrNotFound  = errors.New("not found")

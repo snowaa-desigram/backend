@@ -1,4 +1,4 @@
-package auth
+package service
 
 import (
 	"crypto/rand"
@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/store"
 )
 
 const (
@@ -32,7 +34,7 @@ func NewTokenIssuer(secret string, ttl time.Duration, now func() time.Time) *Tok
 
 func (t *TokenIssuer) TTL() time.Duration { return t.ttl }
 
-func (t *TokenIssuer) IssueAccess(u *User) (string, error) {
+func (t *TokenIssuer) IssueAccess(u *store.User) (string, error) {
 	now := t.now()
 	claims := jwt.MapClaims{
 		"iss":       JWTIssuer,

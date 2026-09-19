@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/snowaa-desigram/backend/services/go/internal/auth"
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/transport"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/zeromicro/go-zero/rest"
@@ -55,7 +55,7 @@ func TestRoutesMatchSpec(t *testing.T) {
 		}
 	}
 
-	public, protected := auth.Routes(auth.NewHandler(nil))
+	public, protected := transport.Routes(transport.NewHandler(nil))
 	inCode := map[string]bool{}
 	for _, r := range append(public, protected...) {
 		inCode[strings.ToUpper(r.Method)+" "+r.Path] = true
@@ -63,12 +63,12 @@ func TestRoutesMatchSpec(t *testing.T) {
 
 	for k := range inSpec {
 		if !inCode[k] {
-			t.Errorf("in spec, not in auth.Routes(): %s", k)
+			t.Errorf("in spec, not in transport.Routes(): %s", k)
 		}
 	}
 	for k := range inCode {
 		if !inSpec[k] {
-			t.Errorf("in auth.Routes(), not in spec: %s", k)
+			t.Errorf("in transport.Routes(), not in spec: %s", k)
 		}
 	}
 }
@@ -76,7 +76,7 @@ func TestRoutesMatchSpec(t *testing.T) {
 // Защищённые маршруты — ровно те, у которых в спеке security: bearerAuth.
 func TestProtectedRoutesMatchSpecSecurity(t *testing.T) {
 	s := loadSpec(t)
-	_, protected := auth.Routes(auth.NewHandler(nil))
+	_, protected := transport.Routes(transport.NewHandler(nil))
 
 	secured := map[string]bool{}
 	for path, item := range s.Paths.Map() {
@@ -102,4 +102,4 @@ func TestProtectedRoutesMatchSpecSecurity(t *testing.T) {
 	}
 }
 
-var _ = rest.Route{} // rest используется в auth.Routes()
+var _ = rest.Route{} // rest используется в transport.Routes()

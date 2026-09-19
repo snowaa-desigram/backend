@@ -83,7 +83,7 @@ jobs:
       - name: Build every service
         run: go build ./cmd/...
 
-  # ---- Python-сервисы: ruff, pytest ----
+  # ---- Python-сервисы: ruff, import-linter (слои), pytest ----
   python:
     runs-on: ubuntu-latest
     defaults:
@@ -98,4 +98,5 @@ jobs:
       - run: uv sync --frozen --all-packages
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - run: uv run lint-imports
       - run: uv run pytest -q

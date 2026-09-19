@@ -1,4 +1,4 @@
-package auth
+package service
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/store"
 )
 
 // Options — параметры логики (см. Config.Options).
@@ -29,16 +31,16 @@ type TokenPair struct {
 
 // Service — вся логика auth: один метод на эндпоинт. Ошибки клиенту — *Error (см. errors.go).
 type Service struct {
-	users  UserStore
-	tokens RefreshTokenStore
-	codes  CodeStore
+	users  store.UserStore
+	tokens store.RefreshTokenStore
+	codes  store.CodeStore
 	mailer Mailer
 	issuer *TokenIssuer
 	now    func() time.Time
 	opts   Options
 }
 
-func NewService(users UserStore, tokens RefreshTokenStore, codes CodeStore, mailer Mailer,
+func NewService(users store.UserStore, tokens store.RefreshTokenStore, codes store.CodeStore, mailer Mailer,
 	issuer *TokenIssuer, now func() time.Time, opts Options) *Service {
 	return &Service{users: users, tokens: tokens, codes: codes, mailer: mailer, issuer: issuer, now: now, opts: opts}
 }
@@ -61,11 +63,11 @@ func (s *Service) Register(ctx context.Context, email, password string) (err err
 		if err := s.users.Update(ctx, u); err != nil {
 			return err
 		}
-	case errors.Is(err, ErrNotFound):
+	case errors.Is(err, store.ErrNotFound):
 		now := s.now()
-		u = &User{ID: uuid.NewString(), Email: email, PasswordHash: hash, CreatedAt: now, UpdatedAt: now}
+		u = &store.User{ID: uuid.NewString(), Email: email, PasswordHash: hash, CreatedAt: now, UpdatedAt: now}
 		if err := s.users.Create(ctx, u); err != nil {
-			if errors.Is(err, ErrDuplicate) {
+			if errors.Is(err, store.ErrDuplicate) {
 				return ErrEmailTaken
 			}
 			return err
@@ -74,26 +76,26 @@ func (s *Service) Register(ctx context.Context, email, password string) (err err
 		return err
 	}
 
-	return s.sendCode(ctx, PurposeRegister, email)
+	return s.sendCode(ctx, store.PurposeRegister, email)
 }
 
 // ResendCode шлёт код регистрации заново. Для неизвестного или уже подтверждённого email молча ничего не делает.
 func (s *Service) ResendCode(ctx context.Context, email string) (err error) {
 	defer track("resend_code", &err)()
 	u, err := s.users.FindByEmail(ctx, email)
-	if errors.Is(err, ErrNotFound) || (err == nil && u.Verified()) {
+	if errors.Is(err, store.ErrNotFound) || (err == nil && u.Verified()) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	return s.sendCode(ctx, PurposeRegister, email)
+	return s.sendCode(ctx, store.PurposeRegister, email)
 }
 
 // ConfirmRegistration проверяет код, помечает email подтверждённым и выдаёт токены.
 func (s *Service) ConfirmRegistration(ctx context.Context, email, code string) (pair *TokenPair, err error) {
 	defer track("confirm_registration", &err)()
-	if err := s.verifyCode(ctx, PurposeRegister, email, code); err != nil {
+	if err := s.verifyCode(ctx, store.PurposeRegister, email, code); err != nil {
 		return nil, err
 	}
 	u, err := s.users.FindByEmail(ctx, email)
@@ -122,7 +124,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (pair *Toke
 	}
 
 	u, err := s.users.FindByEmail(ctx, email)
-	if err != nil && !errors.Is(err, ErrNotFound) {
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return nil, err
 	}
 	if u == nil || !CheckPassword(u.PasswordHash, password) {
@@ -144,7 +146,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (pair *Toke
 func (s *Service) Refresh(ctx context.Context, raw string) (pair *TokenPair, err error) {
 	defer track("refresh", &err)()
 	t, err := s.tokens.FindByHash(ctx, HashToken(raw))
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, ErrInvalidToken
 	}
 	if err != nil {
@@ -174,7 +176,7 @@ func (s *Service) Refresh(ctx context.Context, raw string) (pair *TokenPair, err
 func (s *Service) Logout(ctx context.Context, userID, raw string) (err error) {
 	defer track("logout", &err)()
 	t, err := s.tokens.FindByHash(ctx, HashToken(raw))
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -190,19 +192,19 @@ func (s *Service) Logout(ctx context.Context, userID, raw string) (err error) {
 func (s *Service) ForgotPassword(ctx context.Context, email string) (err error) {
 	defer track("forgot_password", &err)()
 	u, err := s.users.FindByEmail(ctx, email)
-	if errors.Is(err, ErrNotFound) || (err == nil && !u.Verified()) {
+	if errors.Is(err, store.ErrNotFound) || (err == nil && !u.Verified()) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	return s.sendCode(ctx, PurposePasswordReset, email)
+	return s.sendCode(ctx, store.PurposePasswordReset, email)
 }
 
 // ResetPassword по коду ставит новый пароль, удаляет все refresh-токены и выдаёт новую пару.
 func (s *Service) ResetPassword(ctx context.Context, email, code, newPassword string) (pair *TokenPair, err error) {
 	defer track("reset_password", &err)()
-	if err := s.verifyCode(ctx, PurposePasswordReset, email, code); err != nil {
+	if err := s.verifyCode(ctx, store.PurposePasswordReset, email, code); err != nil {
 		return nil, err
 	}
 	u, err := s.users.FindByEmail(ctx, email)
@@ -228,17 +230,17 @@ func (s *Service) ResetPassword(ctx context.Context, email, code, newPassword st
 }
 
 // Me — пользователь по id из access-токена.
-func (s *Service) Me(ctx context.Context, userID string) (u *User, err error) {
+func (s *Service) Me(ctx context.Context, userID string) (u *store.User, err error) {
 	defer track("me", &err)()
 
 	u, err = s.users.FindByID(ctx, userID)
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, ErrUnauthorized
 	}
 	return u, err
 }
 
-func (s *Service) sendCode(ctx context.Context, purpose CodePurpose, email string) error {
+func (s *Service) sendCode(ctx context.Context, purpose store.CodePurpose, email string) error {
 	ok, err := s.codes.SetCooldown(ctx, purpose, email, s.opts.CodeCooldown)
 	if err != nil {
 		return err
@@ -260,9 +262,9 @@ func (s *Service) sendCode(ctx context.Context, purpose CodePurpose, email strin
 	return err
 }
 
-func (s *Service) verifyCode(ctx context.Context, purpose CodePurpose, email, code string) error {
+func (s *Service) verifyCode(ctx context.Context, purpose store.CodePurpose, email, code string) error {
 	hash, attempts, err := s.codes.Get(ctx, purpose, email)
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return ErrCodeExpired
 	}
 	if err != nil {
@@ -273,7 +275,7 @@ func (s *Service) verifyCode(ctx context.Context, purpose CodePurpose, email, co
 	}
 	if !hashEqual(hash, HashCode(code)) {
 		n, err := s.codes.IncrAttempts(ctx, purpose, email)
-		if err != nil && !errors.Is(err, ErrNotFound) {
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return err
 		}
 		if n >= s.opts.CodeMaxAttempts {
@@ -284,7 +286,7 @@ func (s *Service) verifyCode(ctx context.Context, purpose CodePurpose, email, co
 	return s.codes.Delete(ctx, purpose, email)
 }
 
-func (s *Service) issueTokens(ctx context.Context, u *User) (*TokenPair, error) {
+func (s *Service) issueTokens(ctx context.Context, u *store.User) (*TokenPair, error) {
 	access, err := s.issuer.IssueAccess(u)
 	if err != nil {
 		return nil, err
@@ -294,7 +296,7 @@ func (s *Service) issueTokens(ctx context.Context, u *User) (*TokenPair, error) 
 		return nil, err
 	}
 	now := s.now()
-	t := &RefreshToken{ID: uuid.NewString(), UserID: u.ID, TokenHash: hash, ExpiresAt: now.Add(s.opts.RefreshTTL), CreatedAt: now}
+	t := &store.RefreshToken{ID: uuid.NewString(), UserID: u.ID, TokenHash: hash, ExpiresAt: now.Add(s.opts.RefreshTTL), CreatedAt: now}
 	if err := s.tokens.Create(ctx, t); err != nil {
 		return nil, err
 	}

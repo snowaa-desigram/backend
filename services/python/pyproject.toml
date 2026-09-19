@@ -13,7 +13,7 @@ members = ["common", "telegram"]
 desigram-common = { workspace = true }
 
 [dependency-groups]
-dev = ["ruff>=0.13", "pytest>=8.3"]
+dev = ["ruff>=0.13", "pytest>=8.3", "import-linter>=2.3"]
 
 [tool.ruff]
 line-length = 100
@@ -21,3 +21,20 @@ extend-exclude = ["common/gen"]
 
 [tool.pytest.ini_options]
 testpaths = ["common", "telegram"]
+
+# Слои сервисов (openspec/specs/architecture-python-service): servicer → service → clients.
+# Новый сервис: добавить его пакет в root_packages и два контракта по образцу telegram.
+[tool.importlinter]
+root_packages = ["telegram_service"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "telegram: servicer -> service -> clients"
+type = "layers"
+layers = ["telegram_service.servicer", "telegram_service.service", "telegram_service.clients"]
+
+[[tool.importlinter.contracts]]
+name = "telegram: service и clients без grpc и pb"
+type = "forbidden"
+source_modules = ["telegram_service.service", "telegram_service.clients"]
+forbidden_modules = ["grpc", "desigram"]

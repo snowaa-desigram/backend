@@ -5,6 +5,9 @@ import (
 
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/rest"
+
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/adapter"
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/service"
 )
 
 // Config сервиса: rest.RestConf даёт Host/Port, Mode, Log, Prometheus, Telemetry, Timeout и т.д.
@@ -27,7 +30,7 @@ type Config struct {
 	}
 	// Один Redis: кеш для sqlc (пользователи) и коды/счётчики попыток.
 	Redis redis.RedisConf
-	Smtp  SMTPConfig
+	Smtp  adapter.SMTPConfig
 
 	Code struct {
 		TTL         time.Duration `json:",default=10m"`
@@ -41,8 +44,8 @@ type Config struct {
 }
 
 // Options — параметры логики, вынесены из Config, чтобы Service не зависел от go-zero conf.
-func (c Config) Options() Options {
-	return Options{
+func (c Config) Options() service.Options {
+	return service.Options{
 		AppName:          c.AppName,
 		AccessTTL:        time.Duration(c.Auth.AccessExpire) * time.Second,
 		RefreshTTL:       time.Duration(c.RefreshExpire) * time.Second,

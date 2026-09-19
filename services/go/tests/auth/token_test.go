@@ -4,13 +4,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/snowaa-desigram/backend/services/go/internal/auth"
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/service"
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/store"
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func init() { auth.SetBcryptCost(bcrypt.MinCost) } // тесты: bcrypt cost 12 слишком медленный под -race
+func init() { service.SetBcryptCost(bcrypt.MinCost) } // тесты: bcrypt cost 12 слишком медленный под -race
 
 // claimsOf проверяет подпись и возвращает claims; сроки не проверяются — часы в тестах фиктивные.
 func claimsOf(t *testing.T, token string) jwt.MapClaims {
@@ -25,13 +26,13 @@ func claimsOf(t *testing.T, token string) jwt.MapClaims {
 
 func TestIssueAccess(t *testing.T) {
 	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
-	iss := auth.NewTokenIssuer(testSecret, 15*time.Minute, func() time.Time { return now })
-	tok, err := iss.IssueAccess(&auth.User{ID: "u1", Email: testEmail})
+	iss := service.NewTokenIssuer(testSecret, 15*time.Minute, func() time.Time { return now })
+	tok, err := iss.IssueAccess(&store.User{ID: "u1", Email: testEmail})
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := claimsOf(t, tok)
-	if c["sub"] != "u1" || c[auth.ClaimUserID] != "u1" || c[auth.ClaimEmail] != testEmail || c["iss"] != auth.JWTIssuer {
+	if c["sub"] != "u1" || c[service.ClaimUserID] != "u1" || c[service.ClaimEmail] != testEmail || c["iss"] != service.JWTIssuer {
 		t.Fatalf("claims = %v", c)
 	}
 	if exp := int64(c["exp"].(float64)); exp != now.Add(15*time.Minute).Unix() {
@@ -45,16 +46,16 @@ func TestIssueAccess(t *testing.T) {
 }
 
 func TestRefreshAndCode(t *testing.T) {
-	raw, hash, err := auth.NewRefreshToken()
-	if err != nil || len(raw) < 40 || hash != auth.HashToken(raw) {
+	raw, hash, err := service.NewRefreshToken()
+	if err != nil || len(raw) < 40 || hash != service.HashToken(raw) {
 		t.Fatalf("raw=%q hash=%q err=%v", raw, hash, err)
 	}
-	raw2, _, _ := auth.NewRefreshToken()
+	raw2, _, _ := service.NewRefreshToken()
 	if raw == raw2 {
 		t.Fatal("refresh tokens must be unique")
 	}
 	for i := 0; i < 100; i++ {
-		code, err := auth.NewCode()
+		code, err := service.NewCode()
 		if err != nil || !codeRegexp.MatchString(code) || len(code) != 6 {
 			t.Fatalf("code=%q err=%v", code, err)
 		}
@@ -62,11 +63,11 @@ func TestRefreshAndCode(t *testing.T) {
 }
 
 func TestPassword(t *testing.T) {
-	h, err := auth.HashPassword(testPassword)
+	h, err := service.HashPassword(testPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !auth.CheckPassword(h, testPassword) || auth.CheckPassword(h, "nope") {
+	if !service.CheckPassword(h, testPassword) || service.CheckPassword(h, "nope") {
 		t.Fatal("bcrypt check failed")
 	}
 }

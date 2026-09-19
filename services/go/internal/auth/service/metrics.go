@@ -1,10 +1,12 @@
-package auth
+package service
 
 import (
 	"errors"
 	"time"
 
 	"github.com/zeromicro/go-zero/core/metric"
+
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/store"
 )
 
 // Бизнес-метрики auth. HTTP-метрики (http_server_requests_*) go-zero rest снимает сам;
@@ -51,7 +53,7 @@ func track(op string, err *error) func() {
 	}
 }
 
-func trackMail(purpose CodePurpose, start time.Time, err error) {
+func trackMail(purpose store.CodePurpose, start time.Time, err error) {
 	mailDuration.Observe(time.Since(start).Milliseconds(), string(purpose))
 	result := "ok"
 	if err != nil {

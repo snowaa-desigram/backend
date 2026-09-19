@@ -4,13 +4,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/snowaa-desigram/backend/services/go/internal/ping"
+	"github.com/snowaa-desigram/backend/services/go/internal/ping/service"
+	"github.com/snowaa-desigram/backend/services/go/internal/ping/transport"
 
 	pingv1 "github.com/snowaa-desigram/backend/services/go/gen/desigram/ping/v1"
 )
 
 func TestPing(t *testing.T) {
-	resp, err := ping.NewServer().Ping(context.Background(), &pingv1.PingRequest{Message: "hi"})
+	resp, err := transport.NewServer(service.New()).Ping(context.Background(), &pingv1.PingRequest{Message: "hi"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

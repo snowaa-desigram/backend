@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/snowaa-desigram/backend/services/go/internal/auth"
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/service"
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/store"
 )
 
 const (
@@ -21,32 +22,32 @@ var codeRegexp = regexp.MustCompile(`[0-9]{6}`)
 
 // fixture — сервис на in-memory хранилищах с управляемыми часами.
 type fixture struct {
-	svc    *auth.Service
-	users  *auth.MemoryUserStore
-	tokens *auth.MemoryRefreshTokenStore
-	codes  *auth.MemoryCodeStore
-	mailer *auth.FakeMailer
+	svc    *service.Service
+	users  *store.MemoryUserStore
+	tokens *store.MemoryRefreshTokenStore
+	codes  *store.MemoryCodeStore
+	mailer *FakeMailer
 	now    time.Time
-	opts   auth.Options
+	opts   service.Options
 }
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	f := &fixture{
 		now: time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC),
-		opts: auth.Options{
+		opts: service.Options{
 			AppName:   "TestApp",
 			AccessTTL: 15 * time.Minute, RefreshTTL: 30 * 24 * time.Hour,
 			CodeTTL: 10 * time.Minute, CodeCooldown: time.Minute, CodeMaxAttempts: 3,
 			LoginMaxFailures: 3, LoginWindow: 15 * time.Minute,
 		},
-		mailer: &auth.FakeMailer{},
+		mailer: &FakeMailer{},
 	}
 	clock := func() time.Time { return f.now }
-	f.users = auth.NewMemoryUserStore()
-	f.tokens = auth.NewMemoryRefreshTokenStore()
-	f.codes = auth.NewMemoryCodeStore(clock)
-	f.svc = auth.NewService(f.users, f.tokens, f.codes, f.mailer, auth.NewTokenIssuer(testSecret, f.opts.AccessTTL, clock), clock, f.opts)
+	f.users = store.NewMemoryUserStore()
+	f.tokens = store.NewMemoryRefreshTokenStore()
+	f.codes = store.NewMemoryCodeStore(clock)
+	f.svc = service.NewService(f.users, f.tokens, f.codes, f.mailer, service.NewTokenIssuer(testSecret, f.opts.AccessTTL, clock), clock, f.opts)
 	return f
 }
 
@@ -67,7 +68,7 @@ func (f *fixture) lastCode(t *testing.T) string {
 }
 
 // registered — зарегистрированный и подтверждённый пользователь с парой токенов.
-func (f *fixture) registered(t *testing.T) *auth.TokenPair {
+func (f *fixture) registered(t *testing.T) *service.TokenPair {
 	t.Helper()
 	ctx := context.Background()
 	if err := f.svc.Register(ctx, testEmail, testPassword); err != nil {
@@ -81,7 +82,7 @@ func (f *fixture) registered(t *testing.T) *auth.TokenPair {
 	return pair
 }
 
-func mustErr(t *testing.T, got error, want *auth.Error) {
+func mustErr(t *testing.T, got error, want *service.Error) {
 	t.Helper()
 	if !errors.Is(got, want) {
 		t.Fatalf("error = %v, want %v", got, want)
@@ -101,7 +102,7 @@ func TestRegisterConfirmLogin(t *testing.T) {
 
 	// до подтверждения логин запрещён
 	_, err := f.svc.Login(ctx, testEmail, testPassword)
-	mustErr(t, err, auth.ErrEmailNotVerified)
+	mustErr(t, err, service.ErrEmailNotVerified)
 
 	pair, err := f.svc.ConfirmRegistration(ctx, testEmail, f.lastCode(t))
 	if err != nil {
@@ -113,9 +114,9 @@ func TestRegisterConfirmLogin(t *testing.T) {
 
 	// код одноразовый
 	_, err = f.svc.ConfirmRegistration(ctx, testEmail, f.lastCode(t))
-	mustErr(t, err, auth.ErrCodeExpired)
+	mustErr(t, err, service.ErrCodeExpired)
 
-	u, err := f.svc.Me(ctx, claimsOf(t, pair.AccessToken)[auth.ClaimUserID].(string))
+	u, err := f.svc.Me(ctx, claimsOf(t, pair.AccessToken)[service.ClaimUserID].(string))
 	if err != nil || u.Email != testEmail || !u.Verified() {
 		t.Fatalf("me = %+v, %v", u, err)
 	}
@@ -124,9 +125,9 @@ func TestRegisterConfirmLogin(t *testing.T) {
 		t.Fatalf("login: %v", err)
 	}
 	_, err = f.svc.Login(ctx, testEmail, "wrong password")
-	mustErr(t, err, auth.ErrInvalidCredentials)
+	mustErr(t, err, service.ErrInvalidCredentials)
 	_, err = f.svc.Login(ctx, "nobody@example.com", testPassword)
-	mustErr(t, err, auth.ErrInvalidCredentials)
+	mustErr(t, err, service.ErrInvalidCredentials)
 }
 
 func TestRegisterExistingEmail(t *testing.T) {
@@ -137,7 +138,7 @@ func TestRegisterExistingEmail(t *testing.T) {
 	if err := f.svc.Register(ctx, testEmail, "first password"); err != nil {
 		t.Fatal(err)
 	}
-	mustErr(t, f.svc.Register(ctx, testEmail, "second password"), auth.ErrTooManyRequests)
+	mustErr(t, f.svc.Register(ctx, testEmail, "second password"), service.ErrTooManyRequests)
 	f.advance(f.opts.CodeCooldown + time.Second)
 	if err := f.svc.Register(ctx, testEmail, "second password"); err != nil {
 		t.Fatal(err)
@@ -153,7 +154,7 @@ func TestRegisterExistingEmail(t *testing.T) {
 	}
 
 	// подтверждённый — занят
-	mustErr(t, f.svc.Register(ctx, testEmail, "third password"), auth.ErrEmailTaken)
+	mustErr(t, f.svc.Register(ctx, testEmail, "third password"), service.ErrEmailTaken)
 }
 
 func TestConfirmWrongCode(t *testing.T) {
@@ -164,14 +165,14 @@ func TestConfirmWrongCode(t *testing.T) {
 	}
 
 	_, err := f.svc.ConfirmRegistration(ctx, testEmail, "000000")
-	mustErr(t, err, auth.ErrInvalidCode)
+	mustErr(t, err, service.ErrInvalidCode)
 	_, err = f.svc.ConfirmRegistration(ctx, testEmail, "000000")
-	mustErr(t, err, auth.ErrInvalidCode)
+	mustErr(t, err, service.ErrInvalidCode)
 	// третья неудача (MaxAttempts=3) — блок, даже с правильным кодом
 	_, err = f.svc.ConfirmRegistration(ctx, testEmail, "000000")
-	mustErr(t, err, auth.ErrTooManyAttempts)
+	mustErr(t, err, service.ErrTooManyAttempts)
 	_, err = f.svc.ConfirmRegistration(ctx, testEmail, f.lastCode(t))
-	mustErr(t, err, auth.ErrTooManyAttempts)
+	mustErr(t, err, service.ErrTooManyAttempts)
 
 	// новый код снимает блок
 	f.advance(f.opts.CodeCooldown + time.Second)
@@ -192,7 +193,7 @@ func TestConfirmExpiredCode(t *testing.T) {
 	code := f.lastCode(t)
 	f.advance(f.opts.CodeTTL + time.Second)
 	_, err := f.svc.ConfirmRegistration(ctx, testEmail, code)
-	mustErr(t, err, auth.ErrCodeExpired)
+	mustErr(t, err, service.ErrCodeExpired)
 }
 
 func TestResendCodeSilentForUnknownOrVerified(t *testing.T) {
@@ -218,10 +219,10 @@ func TestLoginLockout(t *testing.T) {
 
 	for i := 0; i < f.opts.LoginMaxFailures; i++ {
 		_, err := f.svc.Login(ctx, testEmail, "wrong")
-		mustErr(t, err, auth.ErrInvalidCredentials)
+		mustErr(t, err, service.ErrInvalidCredentials)
 	}
 	_, err := f.svc.Login(ctx, testEmail, testPassword)
-	mustErr(t, err, auth.ErrTooManyAttempts)
+	mustErr(t, err, service.ErrTooManyAttempts)
 
 	f.advance(f.opts.LoginWindow + time.Second)
 	if _, err := f.svc.Login(ctx, testEmail, testPassword); err != nil {
@@ -248,12 +249,12 @@ func TestRefreshRotation(t *testing.T) {
 
 	// повторное использование ротированного — кража: сносим всё, включая новый
 	_, err = f.svc.Refresh(ctx, pair.RefreshToken)
-	mustErr(t, err, auth.ErrInvalidToken)
+	mustErr(t, err, service.ErrInvalidToken)
 	_, err = f.svc.Refresh(ctx, next.RefreshToken)
-	mustErr(t, err, auth.ErrInvalidToken)
+	mustErr(t, err, service.ErrInvalidToken)
 
 	_, err = f.svc.Refresh(ctx, "garbage")
-	mustErr(t, err, auth.ErrInvalidToken)
+	mustErr(t, err, service.ErrInvalidToken)
 }
 
 func TestRefreshExpired(t *testing.T) {
@@ -261,20 +262,20 @@ func TestRefreshExpired(t *testing.T) {
 	pair := f.registered(t)
 	f.advance(f.opts.RefreshTTL + time.Second)
 	_, err := f.svc.Refresh(context.Background(), pair.RefreshToken)
-	mustErr(t, err, auth.ErrInvalidToken)
+	mustErr(t, err, service.ErrInvalidToken)
 }
 
 func TestLogout(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	pair := f.registered(t)
-	uid := claimsOf(t, pair.AccessToken)[auth.ClaimUserID].(string)
+	uid := claimsOf(t, pair.AccessToken)[service.ClaimUserID].(string)
 
 	if err := f.svc.Logout(ctx, uid, pair.RefreshToken); err != nil {
 		t.Fatal(err)
 	}
 	_, err := f.svc.Refresh(ctx, pair.RefreshToken)
-	mustErr(t, err, auth.ErrInvalidToken)
+	mustErr(t, err, service.ErrInvalidToken)
 
 	// идемпотентно; чужой токен — no-op
 	if err := f.svc.Logout(ctx, uid, pair.RefreshToken); err != nil {
@@ -309,20 +310,20 @@ func TestPasswordReset(t *testing.T) {
 
 	// код сброса не годится для подтверждения регистрации и наоборот
 	_, err := f.svc.ConfirmRegistration(ctx, testEmail, code)
-	mustErr(t, err, auth.ErrCodeExpired)
+	mustErr(t, err, service.ErrCodeExpired)
 
 	next, err := f.svc.ResetPassword(ctx, testEmail, code, "new password!")
 	if err != nil {
 		t.Fatalf("reset: %v", err)
 	}
 	_, err = f.svc.Login(ctx, testEmail, testPassword)
-	mustErr(t, err, auth.ErrInvalidCredentials)
+	mustErr(t, err, service.ErrInvalidCredentials)
 	if _, err := f.svc.Login(ctx, testEmail, "new password!"); err != nil {
 		t.Fatalf("login with new password: %v", err)
 	}
 	// старые сессии удалены (без каскада на новую), новая — жива
 	_, err = f.svc.Refresh(ctx, pair.RefreshToken)
-	mustErr(t, err, auth.ErrInvalidToken)
+	mustErr(t, err, service.ErrInvalidToken)
 	if _, err := f.svc.Refresh(ctx, next.RefreshToken); err != nil {
 		t.Fatalf("new session: %v", err)
 	}
@@ -346,5 +347,5 @@ func TestForgotPasswordUnverifiedIsSilent(t *testing.T) {
 func TestMeUnknownUser(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.svc.Me(context.Background(), "missing")
-	mustErr(t, err, auth.ErrUnauthorized)
+	mustErr(t, err, service.ErrUnauthorized)
 }

@@ -14,6 +14,24 @@ linters:
               desc: "каркас — go-zero, rk-boot не используем"
             - pkg: "log$"
               desc: "используй logx из go-zero"
+        # Слои сервиса (openspec/specs/architecture-go-service): transport → service → store; adapter → store.
+        # Полную матрицу (в т.ч. «сервис не импортирует сервис») проверяет tests/architecture — здесь дубль для IDE.
+        store:
+          files: ["**/internal/*/store/**"]
+          deny:
+            - pkg: github.com/snowaa-desigram/backend/services/go/internal/
+              desc: "store — нижний слой, не импортирует другие слои"
+        # Пакет `pkg` не умеет «тот же сервис» — по правилу на сервис, make new-service добавляет своё.
+        auth-service:
+          files: ["**/internal/auth/service/**"]
+          deny:
+            - pkg: github.com/snowaa-desigram/backend/services/go/internal/auth/transport
+              desc: "service не импортирует transport"
+        ping-service:
+          files: ["**/internal/ping/service/**"]
+          deny:
+            - pkg: github.com/snowaa-desigram/backend/services/go/internal/ping/transport
+              desc: "service не импортирует transport"
   exclusions:
     paths:
       - gen/

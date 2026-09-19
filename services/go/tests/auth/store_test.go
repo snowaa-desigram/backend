@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/snowaa-desigram/backend/services/go/internal/auth"
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/store"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/zeromicro/go-zero/core/stores/redis"
@@ -23,11 +23,11 @@ func testDB(t *testing.T) *gorm.DB {
 	if dsn == "" {
 		t.Skip("AUTH_TEST_MYSQL_DSN is not set")
 	}
-	db, err := auth.OpenDB(dsn)
+	db, err := store.OpenDB(dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := auth.Migrate(context.Background(), db); err != nil {
+	if err := store.Migrate(context.Background(), db); err != nil {
 		t.Fatal(err)
 	}
 	// чистим за собой (FK: сначала токены)
@@ -44,28 +44,28 @@ func testRedis(t *testing.T) *redis.Redis {
 	return redis.New(mr.Addr())
 }
 
-// ---- auth.UserStore ----
+// ---- store.UserStore ----
 
 func TestUserStore(t *testing.T) {
-	t.Run("memory", func(t *testing.T) { runUserStoreTests(t, auth.NewMemoryUserStore()) })
-	t.Run("gorm", func(t *testing.T) { runUserStoreTests(t, auth.NewGormUserStore(testDB(t), testRedis(t))) })
+	t.Run("memory", func(t *testing.T) { runUserStoreTests(t, store.NewMemoryUserStore()) })
+	t.Run("gorm", func(t *testing.T) { runUserStoreTests(t, store.NewGormUserStore(testDB(t), testRedis(t))) })
 }
 
-func runUserStoreTests(t *testing.T, s auth.UserStore) {
+func runUserStoreTests(t *testing.T, s store.UserStore) {
 	ctx := context.Background()
 	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
-	u := &auth.User{ID: "11111111-1111-1111-1111-111111111111", Email: "a@example.com", PasswordHash: "h1", CreatedAt: now, UpdatedAt: now}
+	u := &store.User{ID: "11111111-1111-1111-1111-111111111111", Email: "a@example.com", PasswordHash: "h1", CreatedAt: now, UpdatedAt: now}
 
 	// промах по email до создания — кеш «нет» не должен пережить Create
-	if _, err := s.FindByEmail(ctx, u.Email); !errors.Is(err, auth.ErrNotFound) {
+	if _, err := s.FindByEmail(ctx, u.Email); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("FindByEmail before create: %v", err)
 	}
 	if err := s.Create(ctx, u); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	dup := &auth.User{ID: "22222222-2222-2222-2222-222222222222", Email: u.Email, PasswordHash: "h2", CreatedAt: now, UpdatedAt: now}
-	if err := s.Create(ctx, dup); !errors.Is(err, auth.ErrDuplicate) {
-		t.Fatalf("Create duplicate: %v, want auth.ErrDuplicate", err)
+	dup := &store.User{ID: "22222222-2222-2222-2222-222222222222", Email: u.Email, PasswordHash: "h2", CreatedAt: now, UpdatedAt: now}
+	if err := s.Create(ctx, dup); !errors.Is(err, store.ErrDuplicate) {
+		t.Fatalf("Create duplicate: %v, want store.ErrDuplicate", err)
 	}
 
 	got, err := s.FindByEmail(ctx, u.Email)
@@ -75,7 +75,7 @@ func runUserStoreTests(t *testing.T, s auth.UserStore) {
 	if got, err := s.FindByID(ctx, u.ID); err != nil || got.Email != u.Email {
 		t.Fatalf("FindByID: %+v, %v", got, err)
 	}
-	if _, err := s.FindByID(ctx, "missing"); !errors.Is(err, auth.ErrNotFound) {
+	if _, err := s.FindByID(ctx, "missing"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("FindByID missing: %v", err)
 	}
 
@@ -85,9 +85,9 @@ func runUserStoreTests(t *testing.T, s auth.UserStore) {
 		t.Fatalf("Update: %v", err)
 	}
 	// после Update и по id, и по email видим новые данные (кеш сброшен)
-	for _, find := range []func() (*auth.User, error){
-		func() (*auth.User, error) { return s.FindByID(ctx, u.ID) },
-		func() (*auth.User, error) { return s.FindByEmail(ctx, u.Email) },
+	for _, find := range []func() (*store.User, error){
+		func() (*store.User, error) { return s.FindByID(ctx, u.ID) },
+		func() (*store.User, error) { return s.FindByEmail(ctx, u.Email) },
 	} {
 		got, err := find()
 		if err != nil || got.PasswordHash != "h3" || !got.Verified() || !got.EmailVerifiedAt.Equal(verified) {
@@ -96,31 +96,31 @@ func runUserStoreTests(t *testing.T, s auth.UserStore) {
 	}
 }
 
-// ---- auth.RefreshTokenStore ----
+// ---- store.RefreshTokenStore ----
 
 func TestRefreshTokenStore(t *testing.T) {
-	t.Run("memory", func(t *testing.T) { runRefreshTokenStoreTests(t, auth.NewMemoryRefreshTokenStore(), nil) })
+	t.Run("memory", func(t *testing.T) { runRefreshTokenStoreTests(t, store.NewMemoryRefreshTokenStore(), nil) })
 	t.Run("gorm", func(t *testing.T) {
 		db := testDB(t)
-		runRefreshTokenStoreTests(t, auth.NewGormRefreshTokenStore(db), auth.NewGormUserStore(db, testRedis(t)))
+		runRefreshTokenStoreTests(t, store.NewGormRefreshTokenStore(db), store.NewGormUserStore(db, testRedis(t)))
 	})
 }
 
-func runRefreshTokenStoreTests(t *testing.T, s auth.RefreshTokenStore, users auth.UserStore) {
+func runRefreshTokenStoreTests(t *testing.T, s store.RefreshTokenStore, users store.UserStore) {
 	ctx := context.Background()
 	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
 	const userA, userB = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 	if users != nil { // FK в MySQL
 		for _, id := range []string{userA, userB} {
-			if err := users.Create(ctx, &auth.User{ID: id, Email: id + "@example.com", PasswordHash: "h", CreatedAt: now, UpdatedAt: now}); err != nil {
+			if err := users.Create(ctx, &store.User{ID: id, Email: id + "@example.com", PasswordHash: "h", CreatedAt: now, UpdatedAt: now}); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
-	mk := func(id, user, hash string) *auth.RefreshToken {
-		return &auth.RefreshToken{ID: id, UserID: user, TokenHash: hash, ExpiresAt: now.Add(time.Hour), CreatedAt: now}
+	mk := func(id, user, hash string) *store.RefreshToken {
+		return &store.RefreshToken{ID: id, UserID: user, TokenHash: hash, ExpiresAt: now.Add(time.Hour), CreatedAt: now}
 	}
-	for _, tok := range []*auth.RefreshToken{mk("t1", userA, "h1"), mk("t2", userA, "h2"), mk("t3", userB, "h3")} {
+	for _, tok := range []*store.RefreshToken{mk("t1", userA, "h1"), mk("t2", userA, "h2"), mk("t3", userB, "h3")} {
 		if err := s.Create(ctx, tok); err != nil {
 			t.Fatalf("Create %s: %v", tok.ID, err)
 		}
@@ -130,7 +130,7 @@ func runRefreshTokenStoreTests(t *testing.T, s auth.RefreshTokenStore, users aut
 	if err != nil || got.ID != "t1" || got.UserID != userA || got.RevokedAt != nil || !got.ExpiresAt.Equal(now.Add(time.Hour)) {
 		t.Fatalf("FindByHash: %+v, %v", got, err)
 	}
-	if _, err := s.FindByHash(ctx, "nope"); !errors.Is(err, auth.ErrNotFound) {
+	if _, err := s.FindByHash(ctx, "nope"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("FindByHash missing: %v", err)
 	}
 
@@ -152,7 +152,7 @@ func runRefreshTokenStoreTests(t *testing.T, s auth.RefreshTokenStore, users aut
 	if err := s.Delete(ctx, "t2"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.FindByHash(ctx, "h2"); !errors.Is(err, auth.ErrNotFound) {
+	if _, err := s.FindByHash(ctx, "h2"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("after Delete: %v", err)
 	}
 	if err := s.Delete(ctx, "t2"); err != nil { // идемпотентно
@@ -162,7 +162,7 @@ func runRefreshTokenStoreTests(t *testing.T, s auth.RefreshTokenStore, users aut
 	if err := s.DeleteAllForUser(ctx, userA); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.FindByHash(ctx, "h1"); !errors.Is(err, auth.ErrNotFound) {
+	if _, err := s.FindByHash(ctx, "h1"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("after DeleteAllForUser: %v", err)
 	}
 	if _, err := s.FindByHash(ctx, "h3"); err != nil {
@@ -170,90 +170,90 @@ func runRefreshTokenStoreTests(t *testing.T, s auth.RefreshTokenStore, users aut
 	}
 }
 
-// ---- auth.CodeStore ----
+// ---- store.CodeStore ----
 
 func TestCodeStore(t *testing.T) {
 	t.Run("memory", func(t *testing.T) {
 		now := time.Now()
-		runCodeStoreTests(t, auth.NewMemoryCodeStore(func() time.Time { return now }), func(d time.Duration) { now = now.Add(d) })
+		runCodeStoreTests(t, store.NewMemoryCodeStore(func() time.Time { return now }), func(d time.Duration) { now = now.Add(d) })
 	})
 	t.Run("redis", func(t *testing.T) {
 		mr := miniredis.RunT(t)
-		runCodeStoreTests(t, auth.NewRedisCodeStore(redis.New(mr.Addr())), mr.FastForward)
+		runCodeStoreTests(t, store.NewRedisCodeStore(redis.New(mr.Addr())), mr.FastForward)
 	})
 }
 
-func runCodeStoreTests(t *testing.T, s auth.CodeStore, advance func(time.Duration)) {
+func runCodeStoreTests(t *testing.T, s store.CodeStore, advance func(time.Duration)) {
 	ctx := context.Background()
 	const email = "c@example.com"
 
-	if _, _, err := s.Get(ctx, auth.PurposeRegister, email); !errors.Is(err, auth.ErrNotFound) {
+	if _, _, err := s.Get(ctx, store.PurposeRegister, email); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("Get empty: %v", err)
 	}
-	if _, err := s.IncrAttempts(ctx, auth.PurposeRegister, email); !errors.Is(err, auth.ErrNotFound) {
+	if _, err := s.IncrAttempts(ctx, store.PurposeRegister, email); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("IncrAttempts without code: %v", err)
 	}
 
-	if err := s.Put(ctx, auth.PurposeRegister, email, "hash1", 10*time.Minute); err != nil {
+	if err := s.Put(ctx, store.PurposeRegister, email, "hash1", 10*time.Minute); err != nil {
 		t.Fatal(err)
 	}
-	hash, attempts, err := s.Get(ctx, auth.PurposeRegister, email)
+	hash, attempts, err := s.Get(ctx, store.PurposeRegister, email)
 	if err != nil || hash != "hash1" || attempts != 0 {
 		t.Fatalf("Get: %q %d %v", hash, attempts, err)
 	}
 	// другое назначение — отдельный код
-	if _, _, err := s.Get(ctx, auth.PurposePasswordReset, email); !errors.Is(err, auth.ErrNotFound) {
+	if _, _, err := s.Get(ctx, store.PurposePasswordReset, email); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("Get other purpose: %v", err)
 	}
 
 	for want := 1; want <= 2; want++ {
-		if n, err := s.IncrAttempts(ctx, auth.PurposeRegister, email); err != nil || n != want {
+		if n, err := s.IncrAttempts(ctx, store.PurposeRegister, email); err != nil || n != want {
 			t.Fatalf("IncrAttempts: %d %v, want %d", n, err, want)
 		}
 	}
-	if _, attempts, _ := s.Get(ctx, auth.PurposeRegister, email); attempts != 2 {
+	if _, attempts, _ := s.Get(ctx, store.PurposeRegister, email); attempts != 2 {
 		t.Fatalf("attempts = %d, want 2", attempts)
 	}
 	// новый код обнуляет попытки
-	if err := s.Put(ctx, auth.PurposeRegister, email, "hash2", 10*time.Minute); err != nil {
+	if err := s.Put(ctx, store.PurposeRegister, email, "hash2", 10*time.Minute); err != nil {
 		t.Fatal(err)
 	}
-	if hash, attempts, _ := s.Get(ctx, auth.PurposeRegister, email); hash != "hash2" || attempts != 0 {
+	if hash, attempts, _ := s.Get(ctx, store.PurposeRegister, email); hash != "hash2" || attempts != 0 {
 		t.Fatalf("after re-Put: %q %d", hash, attempts)
 	}
-	if _, err := s.IncrAttempts(ctx, auth.PurposeRegister, email); err != nil {
+	if _, err := s.IncrAttempts(ctx, store.PurposeRegister, email); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Delete(ctx, auth.PurposeRegister, email); err != nil {
+	if err := s.Delete(ctx, store.PurposeRegister, email); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.Get(ctx, auth.PurposeRegister, email); !errors.Is(err, auth.ErrNotFound) {
+	if _, _, err := s.Get(ctx, store.PurposeRegister, email); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("after Delete: %v", err)
 	}
 	// попытки удалены вместе с кодом
-	if err := s.Put(ctx, auth.PurposeRegister, email, "hash3", time.Minute); err != nil {
+	if err := s.Put(ctx, store.PurposeRegister, email, "hash3", time.Minute); err != nil {
 		t.Fatal(err)
 	}
-	if _, attempts, _ := s.Get(ctx, auth.PurposeRegister, email); attempts != 0 {
+	if _, attempts, _ := s.Get(ctx, store.PurposeRegister, email); attempts != 0 {
 		t.Fatalf("attempts survived Delete: %d", attempts)
 	}
 	advance(time.Minute + time.Second)
-	if _, _, err := s.Get(ctx, auth.PurposeRegister, email); !errors.Is(err, auth.ErrNotFound) {
+	if _, _, err := s.Get(ctx, store.PurposeRegister, email); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("after TTL: %v", err)
 	}
 
 	// cooldown
-	if ok, err := s.SetCooldown(ctx, auth.PurposeRegister, email, time.Minute); err != nil || !ok {
+	if ok, err := s.SetCooldown(ctx, store.PurposeRegister, email, time.Minute); err != nil || !ok {
 		t.Fatalf("SetCooldown first: %v %v", ok, err)
 	}
-	if ok, _ := s.SetCooldown(ctx, auth.PurposeRegister, email, time.Minute); ok {
+	if ok, _ := s.SetCooldown(ctx, store.PurposeRegister, email, time.Minute); ok {
 		t.Fatal("SetCooldown second must be false")
 	}
-	if ok, _ := s.SetCooldown(ctx, auth.PurposePasswordReset, email, time.Minute); !ok {
+	if ok, _ := s.SetCooldown(ctx, store.PurposePasswordReset, email, time.Minute); !ok {
 		t.Fatal("cooldown is per purpose")
 	}
 	advance(time.Minute + time.Second)
-	if ok, _ := s.SetCooldown(ctx, auth.PurposeRegister, email, time.Minute); !ok {
+	if ok, _ := s.SetCooldown(ctx, store.PurposeRegister, email, time.Minute); !ok {
 		t.Fatal("SetCooldown after TTL must be true")
 	}
 

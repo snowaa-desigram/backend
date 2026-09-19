@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/snowaa-desigram/backend/services/go/internal/auth"
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/service"
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/store"
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/transport"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/zeromicro/go-zero/rest"
@@ -28,16 +30,16 @@ type httpFixture struct {
 
 func newHTTPFixture(t *testing.T) *httpFixture {
 	t.Helper()
-	httpx.SetErrorHandlerCtx(auth.ErrorHandler)
+	httpx.SetErrorHandlerCtx(transport.ErrorHandler)
 	f := newFixture(t)
 	// в HTTP-тестах часы реальные: JWT-middleware go-zero проверяет exp/iat по time.Now
 	f.now = time.Now()
 	h := &httpFixture{fixture: f, routes: map[string]http.Handler{}}
-	public, protected := auth.Routes(auth.NewHandler(f.svc))
+	public, protected := transport.Routes(transport.NewHandler(f.svc))
 	for _, r := range public {
 		h.routes[r.Method+" "+r.Path] = r.Handler
 	}
-	authorize := handler.Authorize(testSecret, handler.WithUnauthorizedCallback(auth.UnauthorizedCallback))
+	authorize := handler.Authorize(testSecret, handler.WithUnauthorizedCallback(transport.UnauthorizedCallback))
 	for _, r := range protected {
 		h.routes[r.Method+" "+r.Path] = authorize(r.Handler)
 	}
@@ -188,7 +190,7 @@ func TestHTTPValidation(t *testing.T) {
 func TestHTTPExpiredAccessToken(t *testing.T) {
 	h := newHTTPFixture(t)
 	past := time.Now().Add(-time.Hour)
-	tok, err := auth.NewTokenIssuer(testSecret, time.Minute, func() time.Time { return past }).IssueAccess(&auth.User{ID: "u1", Email: testEmail})
+	tok, err := service.NewTokenIssuer(testSecret, time.Minute, func() time.Time { return past }).IssueAccess(&store.User{ID: "u1", Email: testEmail})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +198,7 @@ func TestHTTPExpiredAccessToken(t *testing.T) {
 }
 
 func TestErrorHandlerHidesInternal(t *testing.T) {
-	status, body := auth.ErrorHandler(context.Background(), fmt.Errorf("db exploded"))
+	status, body := transport.ErrorHandler(context.Background(), fmt.Errorf("db exploded"))
 	if status != http.StatusInternalServerError || strings.Contains(fmt.Sprint(body), "exploded") {
 		t.Fatalf("status=%d body=%v", status, body)
 	}
@@ -204,7 +206,7 @@ func TestErrorHandlerHidesInternal(t *testing.T) {
 
 func TestHealth(t *testing.T) {
 	rec := httptest.NewRecorder()
-	auth.Health(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
+	transport.Health(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"ok"`) {
 		t.Fatalf("health: %d %s", rec.Code, rec.Body.String())
 	}

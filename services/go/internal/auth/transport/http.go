@@ -1,4 +1,4 @@
-package auth
+package transport
 
 import (
 	"encoding/json"
@@ -10,14 +10,16 @@ import (
 	"github.com/zeromicro/go-zero/rest/httpx"
 
 	authapi "github.com/snowaa-desigram/backend/services/go/gen/openapi/auth"
+
+	"github.com/snowaa-desigram/backend/services/go/internal/auth/service"
 )
 
 // Handler — HTTP-слой: разобрать тело → провалидировать → Service → ответ по OpenAPI.
 type Handler struct {
-	svc *Service
+	svc *service.Service
 }
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+func NewHandler(svc *service.Service) *Handler { return &Handler{svc: svc} }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req authapi.RegisterRequest
@@ -131,7 +133,7 @@ func Health(w http.ResponseWriter, r *http.Request) {
 
 // UserIDFromContext — id пользователя, который положил в контекст JWT-middleware go-zero (claim uid).
 func UserIDFromContext(r *http.Request) string {
-	id, _ := r.Context().Value(ClaimUserID).(string)
+	id, _ := r.Context().Value(service.ClaimUserID).(string)
 	return id
 }
 
@@ -197,7 +199,7 @@ func accepted(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJsonCtx(r.Context(), w, http.StatusAccepted, authapi.Empty{})
 }
 
-func respondTokens(w http.ResponseWriter, r *http.Request, pair *TokenPair, err error) {
+func respondTokens(w http.ResponseWriter, r *http.Request, pair *service.TokenPair, err error) {
 	if err != nil {
 		httpx.ErrorCtx(r.Context(), w, err)
 		return
