@@ -2,7 +2,7 @@
 # Схема ошибки — общая для всех API (common.yaml). Генерация: make openapi
 openapi: 3.1.0
 info:
-  title: Desigram Auth API
+  title: Gram Designer Auth API
   version: 1.0.0
   description: |
     Регистрация и вход по email/password. Код подтверждения приходит на email
@@ -13,7 +13,7 @@ servers:
     description: домен — group_vars `domain` (локально с портом 8443)
     variables:
       domain:
-        default: desigram.localhost:8443
+        default: gram-designer.localhost:8443
 
 tags:
   - name: registration

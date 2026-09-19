@@ -12,7 +12,7 @@ type Config struct {
 	rest.RestConf
 
 	// Имя продукта для писем (APP_NAME из group_vars app_name).
-	AppName string `json:",default=Desigram"`
+	AppName string `json:",default=Gram Designer"`
 
 	// JWT: секрет общий с core (JWT_SECRET), AccessExpire — секунды.
 	Auth struct {
