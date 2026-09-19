@@ -1,0 +1,23 @@
+# Core не хранит пользователей и пароли: access-JWT (HS256) выпускает auth-сервис (backend/services/go/cmd/auth),
+# core проверяет подпись тем же JWT_SECRET и берёт пользователя из claims. Stateless — сессий нет.
+security:
+    providers:
+        # пользователь целиком приходит в токене — провайдер формальный (UserBadge с loader'ом его не использует)
+        jwt: { memory: null }
+
+    firewalls:
+        dev:
+            pattern: ^/(_profiler|_wdt|assets|build)/
+            security: false
+        api:
+            pattern: ^/api
+            stateless: true
+            provider: jwt
+            access_token:
+                token_handler: App\Shared\Infrastructure\Security\JwtAccessTokenHandler
+                failure_handler: App\Shared\Infrastructure\Security\JsonUnauthorizedHandler
+            entry_point: App\Shared\Infrastructure\Security\JsonUnauthorizedHandler
+
+    # Только первое совпавшее правило. Публичные /api/* — без записи здесь.
+    access_control:
+        - { path: ^/api/me, roles: IS_AUTHENTICATED_FULLY }

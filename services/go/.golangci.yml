@@ -17,6 +17,10 @@ linters:
   exclusions:
     paths:
       - gen/
+    rules:
+      # go-zero conf: опции в json-тегах (`json:",default=900"`, `,optional`) — не ошибка
+      - linters: [staticcheck]
+        text: "SA5008"
 
 formatters:
   enable:

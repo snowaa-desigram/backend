@@ -1,0 +1,46 @@
+# go-zero rest: https://go-zero.dev/docs/tutorials/http/server/configuration
+Name: auth.api
+Host: 0.0.0.0
+Port: 8080
+# dev|test|pre|pro
+Mode: ${MODE}
+# bcrypt (~250ms) + синхронная отправка письма по SMTP — запас по таймауту
+Timeout: 10000
+Log:
+  Encoding: json
+  Level: info
+Prometheus:
+  Host: 0.0.0.0
+  Port: 9091
+  Path: /metrics
+Telemetry:
+  Name: auth.api
+  Endpoint: ${OTEL_ENDPOINT}
+  Batcher: otlphttp
+  Sampler: 1.0
+
+# JWT HS256 — секрет общий с core (JWT_SECRET); AccessExpire — секунды
+Auth:
+  AccessSecret: ${JWT_SECRET}
+  AccessExpire: 900
+RefreshExpire: 2592000
+
+DB:
+  DataSource: ${MYSQL_DSN}
+Redis:
+  Host: ${REDIS_ADDR}
+Smtp:
+  Host: ${SMTP_HOST}
+  Port: ${SMTP_PORT}
+  User: ${SMTP_USER}
+  Password: ${SMTP_PASSWORD}
+  From: ${SMTP_FROM}
+  TLS: ${SMTP_TLS}
+
+Code:
+  TTL: 10m
+  Cooldown: 60s
+  MaxAttempts: 5
+Login:
+  MaxFailures: 10
+  Window: 15m

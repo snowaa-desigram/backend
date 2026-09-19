@@ -1,0 +1,7 @@
+# Go-типы из backend/openapi/auth.yaml. Генерация: make openapi (из корня монорепы)
+package: authapi
+output: gen/openapi/auth/types.gen.go
+generate:
+  models: true
+output-options:
+  skip-prune: true

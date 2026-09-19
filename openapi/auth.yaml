@@ -1,0 +1,352 @@
+# Контракт auth-сервиса (Go, go-zero rest). Источник правды для Go-типов (oapi-codegen) и фронта (openapi-typescript).
+# Генерация: make openapi
+openapi: 3.1.0
+info:
+  title: Desigram Auth API
+  version: 1.0.0
+  description: |
+    Регистрация и вход по email/password. Код подтверждения приходит на email
+    при регистрации и при восстановлении пароля. Access-токен — JWT (HS256, 15 минут),
+    refresh — opaque-строка (30 дней, одноразовая: при refresh выдаётся новая пара).
+servers:
+  - url: https://api.desigram.localhost:8443
+    description: local
+
+tags:
+  - name: registration
+  - name: session
+  - name: password
+  - name: profile
+
+paths:
+  /api/auth/register:
+    post:
+      operationId: register
+      tags: [registration]
+      summary: Начать регистрацию — отправить код на email
+      description: |
+        Создаёт неподтверждённого пользователя и отправляет 6-значный код на email.
+        Если email уже зарегистрирован, но не подтверждён — пароль обновляется, код отправляется заново.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '202': { $ref: '#/components/responses/Accepted' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '409':
+          description: email уже зарегистрирован и подтверждён
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: email_taken, message: email is already registered }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/auth/register/confirm:
+    post:
+      operationId: confirmRegistration
+      tags: [registration]
+      summary: Подтвердить email кодом и получить токены
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodeRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Tokens' }
+        '400': { $ref: '#/components/responses/InvalidCode' }
+        '410': { $ref: '#/components/responses/CodeExpired' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /api/auth/register/resend:
+    post:
+      operationId: resendRegistrationCode
+      tags: [registration]
+      summary: Отправить код подтверждения повторно
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailRequest' }
+      responses:
+        '202': { $ref: '#/components/responses/Accepted' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/auth/login:
+    post:
+      operationId: login
+      tags: [session]
+      summary: Вход по email и паролю
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Tokens' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401':
+          description: неверный email или пароль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: invalid_credentials, message: invalid email or password }
+        '403':
+          description: email не подтверждён — нужно пройти register/confirm
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: email_not_verified, message: email is not verified }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /api/auth/refresh:
+    post:
+      operationId: refreshTokens
+      tags: [session]
+      summary: Обменять refresh-токен на новую пару
+      description: Старый refresh-токен отзывается. Повторное использование отозванного токена отзывает все сессии пользователя.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Tokens' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401':
+          description: refresh-токен неизвестен, отозван или истёк
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: invalid_token, message: invalid refresh token }
+
+  /api/auth/logout:
+    post:
+      operationId: logout
+      tags: [session]
+      summary: Отозвать refresh-токен
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '204':
+          description: сессия завершена
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/password/forgot:
+    post:
+      operationId: forgotPassword
+      tags: [password]
+      summary: Отправить код для сброса пароля
+      description: Всегда отвечает 202, даже если email не зарегистрирован — чтобы не раскрывать наличие аккаунта.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailRequest' }
+      responses:
+        '202': { $ref: '#/components/responses/Accepted' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/auth/password/reset:
+    post:
+      operationId: resetPassword
+      tags: [password]
+      summary: Установить новый пароль по коду
+      description: Все выданные refresh-токены пользователя отзываются, возвращается новая пара.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetPasswordRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Tokens' }
+        '400': { $ref: '#/components/responses/InvalidCode' }
+        '410': { $ref: '#/components/responses/CodeExpired' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /api/auth/me:
+    get:
+      operationId: me
+      tags: [profile]
+      summary: Текущий пользователь
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: пользователь из access-токена
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Email:
+      type: string
+      format: email
+      maxLength: 255
+      example: user@example.com
+      x-go-type: string
+    Password:
+      type: string
+      format: password
+      minLength: 8
+      maxLength: 72
+      description: 8–72 байта (ограничение bcrypt)
+    Code:
+      type: string
+      pattern: '^[0-9]{6}$'
+      example: '123456'
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+        password: { $ref: '#/components/schemas/Password' }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+        password: { $ref: '#/components/schemas/Password' }
+    EmailRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+    CodeRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+        code: { $ref: '#/components/schemas/Code' }
+    ResetPasswordRequest:
+      type: object
+      required: [email, code, newPassword]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+        code: { $ref: '#/components/schemas/Code' }
+        newPassword: { $ref: '#/components/schemas/Password' }
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    TokenPair:
+      type: object
+      required: [accessToken, refreshToken, expiresIn]
+      properties:
+        accessToken:
+          type: string
+          description: 'JWT (HS256) для заголовка `Authorization: Bearer …`'
+        refreshToken:
+          type: string
+          description: 'одноразовый opaque-токен для `/api/auth/refresh`'
+        expiresIn:
+          type: integer
+          format: int64
+          description: срок жизни accessToken в секундах
+          example: 900
+    User:
+      type: object
+      required: [id, email, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: string
+        email: { $ref: '#/components/schemas/Email' }
+        createdAt:
+          type: string
+          format: date-time
+    Empty:
+      type: object
+      additionalProperties: false
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: машиночитаемый код ошибки
+          enum:
+            - validation
+            - email_taken
+            - invalid_credentials
+            - email_not_verified
+            - invalid_code
+            - code_expired
+            - invalid_token
+            - unauthorized
+            - too_many_attempts
+            - too_many_requests
+            - internal
+        message:
+          type: string
+        details:
+          type: object
+          description: для `validation` — поле → сообщение
+          additionalProperties: { type: string }
+
+  responses:
+    Accepted:
+      description: код отправлен на email
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Empty' }
+    Tokens:
+      description: пара токенов
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TokenPair' }
+    Validation:
+      description: невалидное тело запроса
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: validation, message: invalid request, details: { email: 'must be a valid email' } }
+    Unauthorized:
+      description: нет или невалидный access-токен
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: unauthorized, message: unauthorized }
+    InvalidCode:
+      description: невалидное тело или неверный код
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: invalid_code, message: invalid code }
+    CodeExpired:
+      description: код истёк или не запрашивался
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: code_expired, message: 'code expired, request a new one' }
+    TooManyAttempts:
+      description: превышено число попыток
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: too_many_attempts, message: 'too many attempts, try later' }
+    TooManyRequests:
+      description: слишком частые запросы кода (cooldown)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: too_many_requests, message: 'code was sent recently, try later' }

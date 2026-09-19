@@ -47,11 +47,22 @@ jobs:
       - run: composer test
 
   # ---- Go-сервисы: vet, golangci-lint (+ depguard — архитектурные правила), tests ----
+  # MySQL — для контрактных тестов GORM-хранилищ auth (tests/auth/store_test.go); Redis в тестах — miniredis.
   go:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: services/go
+    services:
+      mysql:
+        image: mysql:9
+        env:
+          MYSQL_DATABASE: auth_test
+          MYSQL_ROOT_PASSWORD: root
+        ports: ["3306:3306"]
+        options: --health-cmd "mysqladmin ping -h localhost" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      AUTH_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/auth_test?parseTime=true&charset=utf8mb4&loc=UTC
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -62,6 +73,11 @@ jobs:
       - uses: golangci/golangci-lint-action@v8
         with:
           working-directory: services/go
+      # OpenAPI → Go-типы должны быть перегенерированы и закоммичены (make openapi в корне монорепы)
+      - name: openapi types are up to date
+        run: |
+          go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config oapi-codegen.yaml ../../openapi/auth.yaml
+          git diff --exit-code -- gen/openapi
       - run: go test -race ./...
       - name: Build every service
         run: go build ./cmd/...

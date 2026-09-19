@@ -14,6 +14,7 @@
         "doctrine/doctrine-bundle": "^3.3",
         "doctrine/doctrine-migrations-bundle": "^4.0",
         "doctrine/orm": "^3.7",
+        "firebase/php-jwt": "^7.0",
         "google/protobuf": "*",
         "grpc/grpc": "*",
         "nelmio/cors-bundle": "^2.6",
@@ -25,6 +26,7 @@
         "symfony/messenger": "7.4.*",
         "symfony/monolog-bundle": "*",
         "symfony/runtime": "7.4.*",
+        "symfony/security-bundle": "7.4.*",
         "symfony/yaml": "7.4.*"
     },
     "config": {
