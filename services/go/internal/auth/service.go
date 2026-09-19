@@ -45,7 +45,8 @@ func NewService(users UserStore, tokens RefreshTokenStore, codes CodeStore, mail
 
 // Register создаёт неподтверждённого пользователя и шлёт код. Повторная регистрация неподтверждённого
 // email обновляет пароль и шлёт код заново; подтверждённого — ErrEmailTaken.
-func (s *Service) Register(ctx context.Context, email, password string) error {
+func (s *Service) Register(ctx context.Context, email, password string) (err error) {
+	defer track("register", &err)()
 	hash, err := HashPassword(password)
 	if err != nil {
 		return err
@@ -77,7 +78,8 @@ func (s *Service) Register(ctx context.Context, email, password string) error {
 }
 
 // ResendCode шлёт код регистрации заново. Для неизвестного или уже подтверждённого email молча ничего не делает.
-func (s *Service) ResendCode(ctx context.Context, email string) error {
+func (s *Service) ResendCode(ctx context.Context, email string) (err error) {
+	defer track("resend_code", &err)()
 	u, err := s.users.FindByEmail(ctx, email)
 	if errors.Is(err, ErrNotFound) || (err == nil && u.Verified()) {
 		return nil
@@ -89,7 +91,8 @@ func (s *Service) ResendCode(ctx context.Context, email string) error {
 }
 
 // ConfirmRegistration проверяет код, помечает email подтверждённым и выдаёт токены.
-func (s *Service) ConfirmRegistration(ctx context.Context, email, code string) (*TokenPair, error) {
+func (s *Service) ConfirmRegistration(ctx context.Context, email, code string) (pair *TokenPair, err error) {
+	defer track("confirm_registration", &err)()
 	if err := s.verifyCode(ctx, PurposeRegister, email, code); err != nil {
 		return nil, err
 	}
@@ -108,7 +111,8 @@ func (s *Service) ConfirmRegistration(ctx context.Context, email, code string) (
 }
 
 // Login — email+password → токены. После LoginMaxFailures неудач подряд в окне — ErrTooManyAttempts.
-func (s *Service) Login(ctx context.Context, email, password string) (*TokenPair, error) {
+func (s *Service) Login(ctx context.Context, email, password string) (pair *TokenPair, err error) {
+	defer track("login", &err)()
 	failures, err := s.codes.Failures(ctx, email)
 	if err != nil {
 		return nil, err
@@ -137,7 +141,8 @@ func (s *Service) Login(ctx context.Context, email, password string) (*TokenPair
 }
 
 // Refresh ротирует refresh-токен. Повторное использование уже ротированного — признак кражи: сносим все сессии.
-func (s *Service) Refresh(ctx context.Context, raw string) (*TokenPair, error) {
+func (s *Service) Refresh(ctx context.Context, raw string) (pair *TokenPair, err error) {
+	defer track("refresh", &err)()
 	t, err := s.tokens.FindByHash(ctx, HashToken(raw))
 	if errors.Is(err, ErrNotFound) {
 		return nil, ErrInvalidToken
@@ -166,7 +171,8 @@ func (s *Service) Refresh(ctx context.Context, raw string) (*TokenPair, error) {
 }
 
 // Logout удаляет refresh-токен пользователя. Идемпотентен: чужой или неизвестный токен — no-op.
-func (s *Service) Logout(ctx context.Context, userID, raw string) error {
+func (s *Service) Logout(ctx context.Context, userID, raw string) (err error) {
+	defer track("logout", &err)()
 	t, err := s.tokens.FindByHash(ctx, HashToken(raw))
 	if errors.Is(err, ErrNotFound) {
 		return nil
@@ -181,7 +187,8 @@ func (s *Service) Logout(ctx context.Context, userID, raw string) error {
 }
 
 // ForgotPassword шлёт код сброса. Неизвестный или неподтверждённый email — молча nil (не раскрываем наличие аккаунта).
-func (s *Service) ForgotPassword(ctx context.Context, email string) error {
+func (s *Service) ForgotPassword(ctx context.Context, email string) (err error) {
+	defer track("forgot_password", &err)()
 	u, err := s.users.FindByEmail(ctx, email)
 	if errors.Is(err, ErrNotFound) || (err == nil && !u.Verified()) {
 		return nil
@@ -193,7 +200,8 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 }
 
 // ResetPassword по коду ставит новый пароль, удаляет все refresh-токены и выдаёт новую пару.
-func (s *Service) ResetPassword(ctx context.Context, email, code, newPassword string) (*TokenPair, error) {
+func (s *Service) ResetPassword(ctx context.Context, email, code, newPassword string) (pair *TokenPair, err error) {
+	defer track("reset_password", &err)()
 	if err := s.verifyCode(ctx, PurposePasswordReset, email, code); err != nil {
 		return nil, err
 	}
@@ -220,8 +228,10 @@ func (s *Service) ResetPassword(ctx context.Context, email, code, newPassword st
 }
 
 // Me — пользователь по id из access-токена.
-func (s *Service) Me(ctx context.Context, userID string) (*User, error) {
-	u, err := s.users.FindByID(ctx, userID)
+func (s *Service) Me(ctx context.Context, userID string) (u *User, err error) {
+	defer track("me", &err)()
+
+	u, err = s.users.FindByID(ctx, userID)
 	if errors.Is(err, ErrNotFound) {
 		return nil, ErrUnauthorized
 	}
@@ -244,7 +254,10 @@ func (s *Service) sendCode(ctx context.Context, purpose CodePurpose, email strin
 		return err
 	}
 	t := mailTemplates[purpose]
-	return s.mailer.Send(ctx, email, s.opts.AppName+": "+t.subject, fmt.Sprintf(t.body, code, int(s.opts.CodeTTL.Minutes())))
+	start := time.Now()
+	err = s.mailer.Send(ctx, email, s.opts.AppName+": "+t.subject, fmt.Sprintf(t.body, code, int(s.opts.CodeTTL.Minutes())))
+	trackMail(purpose, start, err)
+	return err
 }
 
 func (s *Service) verifyCode(ctx context.Context, purpose CodePurpose, email, code string) error {
